@@ -43,6 +43,18 @@ jobs:
           cache: gradle
           cache-dependency-path: upstream/**/*.gradle*
 
+      - name: Locate Android SDK manager
+        shell: bash
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME" -type f -name sdkmanager -print -quit)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager was not found under $ANDROID_HOME" >&2
+            find "$ANDROID_HOME" -maxdepth 4 -type d -print | head -100
+            exit 1
+          fi
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          echo "Found sdkmanager at $SDKMANAGER"
+
       - name: Accept Android SDK licences
         run: |
           yes | sdkmanager --licenses >/dev/null || true
