@@ -1,0 +1,86 @@
+name: Build NerdMiner Solo APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-apk.yml'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Checkout Android mining engine
+        uses: actions/checkout@v4
+        with:
+          repository: VirtusVerbis/BTC_Anrdoid_Miner
+          ref: main
+          path: upstream
+          persist-credentials: false
+
+      - name: Install shader compiler and Python
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslc python3
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: upstream/**/*.gradle*
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android native build tools
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.1.8937393" "cmake;3.22.1"
+
+      - name: Apply NerdMiner Solo branding
+        working-directory: upstream
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace('applicationId = "com.btcminer.android"', 'applicationId = "com.winsmediatama.nerdminersolo"')
+          p.write_text(s)
+          p = Path("app/src/main/res/values/strings.xml")
+          s = p.read_text()
+          s = s.replace('<string name="app_name">BTC Miner</string>', '<string name="app_name">NerdMiner Solo</string>')
+          s = s.replace('<string name="dashboard_title">Bitcoin Android Miner</string>', '<string name="dashboard_title">NerdMiner Solo BTC</string>')
+          p.write_text(s)
+          PY
+
+      - name: Build debug APK
+        working-directory: upstream
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Verify APK exists
+        working-directory: upstream
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NerdMiner-Solo-Android-debug
+          path: upstream/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
