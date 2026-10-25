@@ -78,18 +78,14 @@ jobs:
           s = s.replace('<string name="dashboard_title">Bitcoin Android Miner</string>', '<string name="dashboard_title">NerdMiner Solo BTC</string>')
           p.write_text(s)
 
-          # Do not execute native JNI self-tests during Activity startup. A device-specific
-          # native/CPU-feature failure here can terminate the app before the dashboard appears.
-          p = Path("app/src/main/kotlin/com/btcminer/android/MainActivity.kt")
-          s = p.read_text()
+          # Avoid running JNI self-tests during Activity startup; defer diagnostics until explicitly needed.
           import re
           p = Path("app/src/main/kotlin/com/btcminer/android/MainActivity.kt")
           s = p.read_text()
-          pattern = r"        // Phase 1: verify native miner loads and responds\\n.*?        \\).show\\(\\)\\n"
-          s, count = re.subn(pattern, "        // Native diagnostics are deferred so device-specific JNI self-tests cannot crash startup.\\n", s, count=1, flags=re.S)
+          pattern = r"        // Phase 1: verify native miner loads and responds\n.*?        \).show\(\)\n"
+          s, count = re.subn(pattern, "        // Native diagnostics are deferred to avoid device-specific startup failures.\n", s, count=1, flags=re.S)
           if count != 1:
               raise SystemExit("Expected startup JNI self-test block not found; refusing unsafe patch")
-          p.write_text(s)
           p.write_text(s)
           PY
 
