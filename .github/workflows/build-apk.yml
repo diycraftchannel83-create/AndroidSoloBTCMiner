@@ -82,19 +82,14 @@ jobs:
           # native/CPU-feature failure here can terminate the app before the dashboard appears.
           p = Path("app/src/main/kotlin/com/btcminer/android/MainActivity.kt")
           s = p.read_text()
-          startup_probe = """        // Phase 1: verify native miner loads and responds
-          Toast.makeText(this, "Native miner: ${NativeMiner.nativeVersion()}", Toast.LENGTH_SHORT).show()
-          // Validate: SHA-256 implementation
-          val phase2Ok = NativeMiner.nativeTestSha256()
-          Toast.makeText(
-              this,
-              if (phase2Ok) "Validate: SHA-256 OK" else "Validate: SHA-256 FAIL",
-              Toast.LENGTH_SHORT
-          ).show()
-"""
-          if startup_probe not in s:
+          import re
+          p = Path("app/src/main/kotlin/com/btcminer/android/MainActivity.kt")
+          s = p.read_text()
+          pattern = r"        // Phase 1: verify native miner loads and responds\\n.*?        \\).show\\(\\)\\n"
+          s, count = re.subn(pattern, "        // Native diagnostics are deferred so device-specific JNI self-tests cannot crash startup.\\n", s, count=1, flags=re.S)
+          if count != 1:
               raise SystemExit("Expected startup JNI self-test block not found; refusing unsafe patch")
-          s = s.replace(startup_probe, "        // Native diagnostics are intentionally deferred until mining diagnostics are requested.\n")
+          p.write_text(s)
           p.write_text(s)
           PY
 
